@@ -1,7 +1,7 @@
 /*
  * XORlock - Simple File Encryption Tool
  * Version: 1.0
- * Author: [Fom0242]
+ * Author: [fom0242]
  * Description: A minimal file encryption tool using XOR cipher
  */
 
@@ -58,15 +58,45 @@ void XORL_XorEncryptFile(const char *input_file, const char *output_file,
     exit(EXIT_FAILURE);
   }
 
+  fseek(input, 0, SEEK_END);
+  long file_size = ftell(input);
+  fseek(input, 0, SEEK_SET);
+
+  printf("File size: %.2f MB\n", file_size / (1024.0 * 1024.0));
+
   int password_len = strlen(password);
   int password_index = 0;
   int current_char;
+  long processed_bytes = 0;
+  int last_percent = -1;
 
   while ((current_char = fgetc(input)) != EOF) {
     fputc(current_char ^ password[password_index], output);
     password_index = (password_index + 1) % password_len;
+
+    processed_bytes++;
+
+    int percent = (int)((double)processed_bytes / file_size * 100);
+    if (percent != last_percent && (percent % 1 == 0)) {
+      printf("\rProcessing: %3d%% [", percent);
+      int bar_width = 50;
+      int pos = (int)(bar_width * processed_bytes / file_size);
+      for (int i = 0; i < bar_width; i++) {
+        if (i < pos)
+          printf("=");
+        else if (i == pos)
+          printf(">");
+        else
+          printf(" ");
+      }
+      printf("] %.2f/%.2f MB", processed_bytes / (1024.0 * 1024.0),
+             file_size / (1024.0 * 1024.0));
+      fflush(stdout);
+      last_percent = percent;
+    }
   }
 
+  printf("\n");
   fclose(input);
   fclose(output);
 }
@@ -110,24 +140,38 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  char output_file[1024];
+
   if (strcmp(mode, "-e") == 0 || strcmp(mode, "--encrypt") == 0) {
-    char output_file[256];
-    snprintf(output_file, sizeof(output_file), "%s.enc", input_file);
+    size_t result =
+        snprintf(output_file, sizeof(output_file), "%s.enc", input_file);
+    if (result >= sizeof(output_file)) {
+      fprintf(stderr, "Error: Output filename too long (max %zu chars)\n",
+              sizeof(output_file) - 1);
+      return 1;
+    }
 
     printf("Encrypting: %s -> %s\n", input_file, output_file);
     XORL_XorEncryptFile(input_file, output_file, password);
     printf("Encryption complete!\n");
   } else if (strcmp(mode, "-d") == 0 || strcmp(mode, "--decrypt") == 0) {
-    char output_file[256];
-
     if (XORL_IsEncryptedFile(input_file)) {
-      int len = strlen(input_file);
+      size_t len = strlen(input_file);
+      if (len - 4 >= sizeof(output_file)) {
+        fprintf(stderr, "Error: Output filename too long\n");
+        return 1;
+      }
       strncpy(output_file, input_file, len - 4);
       output_file[len - 4] = '\0';
     } else {
-      snprintf(output_file, sizeof(output_file), "%s.dec", input_file);
+      size_t result =
+          snprintf(output_file, sizeof(output_file), "%s.dec", input_file);
+      if (result >= sizeof(output_file)) {
+        fprintf(stderr, "Error: Output filename too long (max %zu chars)\n",
+                sizeof(output_file) - 1);
+        return 1;
+      }
     }
-
     printf("Decrypting: %s -> %s\n", input_file, output_file);
     XORL_XorEncryptFile(input_file, output_file, password);
     printf("Decryption complete!\n");
