@@ -1,0 +1,11 @@
+xorlock
+xorlock.exe
+*.o
+test_*
+*.tmp
+.DS_Store
+*~
+*.swp
+*.swo
+core
+vgcore.*
